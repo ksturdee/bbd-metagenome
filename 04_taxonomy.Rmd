@@ -61,3 +61,13 @@ Submit the job (487):
 sbatch run_gtdbtk.sh
 ```
 
+Confirm output.
+```{bash}
+ls -l out/gtdbtk.bac120.summary.tsv
+```
+
+Move output.
+```{bash}
+cp out/gtdbtk.bac120.summary.tsv .
+```
+

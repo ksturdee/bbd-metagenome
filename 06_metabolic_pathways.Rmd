@@ -1,6 +1,6 @@
 ---
 title: "BBD Metagenome: Metabolic Pathways"
-author: "Your Name"
+author: "Kendra"
 date: "`r Sys.Date()`"
 output:
   github_document:
@@ -23,3 +23,176 @@ bash chunk. R chunks run from the top of the repository.
 -->
 
 Metabolic pathways inferred from the Prokka annotations with MinPath. Commands for this step were run in `minpath/`.
+
+Change directory. Investigate a single bin (`metabat.30`)
+```{bash}
+cd ~/bbd-metagenome/minpath
+
+head ../prokka/metabat.30/metabat.30.tsv
+```
+For input to minpath we only want to keep a unique ID for each gene (column 1) and its EC number (column 5). Must transform the tsv into this format using awk:
+```{bash}
+head ../prokka/metabat.30/metabat.30.tsv | awk -F '\t' '{print $1,$5}'
+```
+Here, we are using -F '\t' to tell awk that our input is tab separated. We also want to filter the output to only include lines with an EC number, and ensure that the output is tab separated and we also need to remove the header line. 
+
+```{bash}
+head ../prokka/metabat.30/metabat.30.tsv | awk -F '\t' '$5{print $1,$5}'
+
+head ../prokka/metabat.30/metabat.30.tsv | awk -F '\t' '$5{OFS="\t";print $1,$5}' | grep -v '^locus'
+```
+
+Change head to cat to include all genes:
+```{bash}
+cat ../prokka/metabat.30/metabat.30.tsv | awk -F '\t' '$5{OFS="\t";print $1,$5}' | grep -v '^locus'
+```
+
+Send the output to a file so that it can be used as input to minpath:
+```{bash}
+cat ../prokka/metabat.30/metabat.30.tsv | awk -F '\t' '$5{OFS="\t";print $1,$5}' | grep -v '^locus' > metabat.30.ec
+```
+
+Run minpath on this file as follows;
+```{bash}
+minpath -ec metabat.30.ec -report metabat.30.ec.report -details metabat.30.ec.details
+```
+
+Look at output head:
+```{bash}
+head metabat.30.ec.report 
+```
+
+Line 1: `path PWY-6012-1 any n/a  naive 1  minpath 1  fam0  1  fam-found  1  name  acyl carrier protein activation.`
+- PWY-6012-1 is a pathway identifier in the metacyc database. You can use this to lookup the full pathway.
+- native 1: at least one gene from this pathway was found. 
+- minipath 1: minpath kept this pathway in its minimal set of pathways. If this says minpath 0 then minpath decided that the genes found are better explained by other pathways, so the evidence for this one is weak
+- fam0 1: one gene involved in this path
+- fam-found 1: one gene family from the pathway in this genome
+- name acyl carrier protein activation: pathway name
+
+Prepare minipath inputs for all bins, and then run:
+```{bash}
+while read bin;do 
+  cat ../prokka/$bin/${bin}.tsv | awk -F '\t' '$5{printf("%s\t%s\n", $1,$5)}' | grep -v '^locus' > ${bin}.ec 
+done < ../checkm/bbd_topbins.txt
+
+while read bin;do 
+  minpath -ec ${bin}.ec -report ${bin}.ec.report -details ${bin}.ec.details
+done < ../checkm/bbd_topbins.txt
+```
+
+The output is large, but the focus is on two pathways. The first pathway of interest is `PWY-101`, which includes the essential components of photosynthesis that occur in light, Photosystem I and Photosystem II.
+```{bash}
+grep 'PWY-101' *.ec.report
+```
+
+Assess the output:
+```{r photosynthesis-table, echo=FALSE, message=FALSE, warning=FALSE}
+library(tibble)
+library(knitr)
+
+photosynthesis_table <- tribble(
+  ~Bin,          ~Pathway,  ~Naive, ~MinPath, ~`Fam0`, ~`Fam found`,
+  "contig_120",  "PWY-101",      1,        0,       4,           1,
+  "metabat.15",  "PWY-101",      1,        1,       4,           1,
+  "metabat.41",  "PWY-101",      1,        0,       4,           1,
+  "metabat.42",  "PWY-101",      1,        1,       4,           4
+)
+
+kable(
+  photosynthesis_table,
+  caption = "Detection of the photosynthesis light-reaction pathway (PWY-101) across the unbinned contig and metagenome-assembled genome (MAG) bins.",
+  align = c("l", "l", "c", "c", "c", "c"),
+  col.names = c("Bin / contig", "Pathway", "Naive", "MinPath", "Families expected", "Families found")
+)
+```
+These results show that  at least 4 bins contain at least one gene from this (PWY-101) pathway. Metabat.42 has 4/4 gene families (the complete pathway), while the other three families only have 1/4 genes from the pathway. MinPath retains the pathway for: metabat.15 and metabat.42.
+
+Cross reference the results with `gtdbtk` to see taxonomy.
+
+```{bash}
+grep 'contig_120' ../gtdbtk/gtdbtk.bac120.summary.tsv
+grep 'metabat.15' ../gtdbtk/gtdbtk.bac120.summary.tsv
+grep 'metabat.41' ../gtdbtk/gtdbtk.bac120.summary.tsv
+grep 'metabat.42' ../gtdbtk/gtdbtk.bac120.summary.tsv
+```
+
+Clean results:
+```{r taxonomy-pathway-table, echo=FALSE, message=FALSE, warning=FALSE}
+library(tibble)
+library(knitr)
+ 
+pathway_taxonomy <- tribble(
+  ~Bin, ~Phylum, ~Class, ~Family, ~Taxon, ~`Genes detected`, ~MinPath,
+  "contig_120", "Bacteroidota", "Bacteroidia", "Bernardetiaceae",
+  "UBA2561 sp002340355", "1/4", 0,
+
+  "metabat.15", "Firmicutes_A", "Clostridia", "Vallitaleaceae",
+  "Unclassified", "1/4", 1,
+
+  "metabat.41", "Desulfobacterota", "Desulfobacteria", "Desulforegulaceae",
+  "Unclassified", "1/4", 0,
+
+  "metabat.42", "Cyanobacteria", "Cyanobacteriia", "Desertifilaceae",
+  "Roseofilum reptotaenium_A", "4/4", 1
+)
+
+kable(
+  pathway_taxonomy,
+  caption = "Taxonomic classification and detection of the PWY-101 photosynthesis light-reaction pathway across bins.",
+  align = c("l", "l", "l", "l", "l", "c", "c")
+)
+```
+
+Repeat the process for the path `PWY-5360`, a superpathway of tetrathionate reduction which includes enzymes required to reduce sulfite to hydrogen sulfide.
+
+```{bash}
+grep 'PWY-5360' *.ec.report
+```
+
+```{r tetrathionate-table, echo=FALSE, message=FALSE, warning=FALSE}
+library(tibble) 
+library(knitr)
+
+tetrathionate_table <- tribble(
+  ~Bin,         ~Pathway,   ~Naive, ~MinPath, ~`Families expected`, ~`Families found`,
+  "metabat.12", "PWY-5360",      1,        0,                    3,                 1
+)
+
+kable(
+  tetrathionate_table,
+  caption = "Detection of the superpathway of tetrathionate reduction (PWY-5360) across metagenome-assembled genome (MAG) bins.",
+  align = c("l", "l", "c", "c", "c", "c")
+)
+```
+One bin, `metabat.12` contained at least one gene from this pathway. The pathway is detected by the naive method (`naive = 1`) but not retained by MinPath, so these results do not support a complete tetrathionate-reduction pathway in this bin.
+
+Cross reference the results with `gtdbtk` to see taxonomy:
+```{bash}
+grep 'metabat.12' ../gtdbtk/gtdbtk.bac120.summary.tsv
+```
+
+```{r tetrathionate-table, echo=FALSE, message=FALSE, warning=FALSE}
+library(tibble)
+library(knitr) 
+
+tetrathionate_table <- tribble(
+  ~Bin, ~Phylum, ~Class, ~Family, ~Taxon,
+  ~`Genes detected`, ~MinPath,
+  "metabat.12", "Campylobacterota", "Campylobacteria",
+  "Arcobacteraceae", "Halarcobacter sp.", "1/3", 0
+)
+
+kable(
+  tetrathionate_table,
+  caption = "Taxonomic classification and detection of the PWY-5360 superpathway of tetrathionate reduction.",
+  align = c("l", "l", "l", "l", "l", "c", "c")
+)
+```
+
+`metabat.12` corresponds to the order Campylobacterales and family Arcobacteraceae, and was classified to the genus Halarcobacter. However the evidence for this was weak; only 1/3 of the expected gene families were detected and minipath did not retain the pathway. 
+
+
+
+
+
