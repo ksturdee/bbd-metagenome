@@ -1,0 +1,181 @@
+---
+title: "07_Data_Visualization"
+author: "Kendra"
+date: "`r Sys.Date()`"
+output:
+  github_document:
+    html_preview: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Bash chunks are a record of commands you ran in the Terminal. Knitting shows
+# them but doesn't run them again.
+knitr::opts_hooks$set(engine = function(options) {
+  if (options$engine == "bash") options$eval <- FALSE
+  options
+})
+
+library(Biostrings)
+library(tidyverse)
+library(knitr)
+```
+
+
+## Table 1
+General summary metrics on the assembly
+```{r}
+# Read Flye assembly
+assembly <- readDNAStringSet("flye/bbd/assembly.fasta")
+# Calculate contig lengths
+contig_lengths <- width(assembly)
+sorted_lengths <- sort(contig_lengths, decreasing = TRUE)
+
+# Calculate N50
+cumulative_length <- cumsum(sorted_lengths)
+n50 <- sorted_lengths[
+  which(cumulative_length >= sum(sorted_lengths) / 2)[1]
+]
+
+# Create Table 1
+assembly_table <- data.frame(
+  Metric = c(
+    "Total assembly length",
+    "Number of contigs",
+    "N50",
+    "Longest contig",
+    "Mean contig length",
+    "Median contig length"
+  ),
+  Value = c(
+    paste0(round(sum(contig_lengths) / 1e6, 2), " Mb"),
+    format(length(contig_lengths), big.mark = ","),
+    paste0(format(n50, big.mark = ","), " bp"),
+    paste0(format(max(contig_lengths), big.mark = ","), " bp"),
+    paste0(format(round(mean(contig_lengths)), big.mark = ","), " bp"),
+    paste0(format(round(median(contig_lengths)), big.mark = ","), " bp")
+  )
+)
+
+knitr::kable(
+  assembly_table,
+  caption = "Table 1. Summary statistics for the black band disease metagenome assembly generated with Flye.",
+  align = c("l", "r")
+)
+```
+
+
+To answer "what organisms make up the largest components of the assembly?" -- RESULTS FROM GTD
+```{r}
+gtdbtk <- read_tsv("gtdbtk/gtdbtk.bac120.summary.tsv")
+
+gtdbtkTABLE <- gtdbtk |> separate_longer_delim(classification, delim = ";") |>
+  group_by(user_genome) |>
+  slice_tail(n=3) |>
+  summarise(short_classification = paste(classification, collapse =""))
+
+gtdbtkTABLE
+
+```
+
+## GC content
+
+```{r figure1-gc, echo=FALSE, message=FALSE, warning=FALSE, fig.width=8, fig.height=5}
+
+gc_content <- letterFrequency(assembly, letters = c("G", "C"))
+
+gc_df <- tibble(
+  GC = rowSums(gc_content) / width(assembly)
+)
+
+ggplot(gc_df, aes(x = GC)) +
+  geom_histogram(
+    binwidth = 0.025,
+    fill = "black",
+    colour = "white"
+  ) +
+  labs(
+    x = "GC content",
+    y = "Number of contigs"
+  ) +
+  theme_classic(base_size = 12)
+```
+
+```{r}
+checkm_lines <- readLines("checkm/checkm_results_bbd.txt")
+
+# Keep actual bin-result lines only
+checkm_lines <- checkm_lines[
+  grepl("^(contig_|metabat\\.)", trimws(checkm_lines))
+]
+
+# Split whitespace-delimited CheckM output
+checkm_split <- strsplit(trimws(checkm_lines), "\\s+")
+
+checkm_df <- do.call(rbind, lapply(checkm_split, function(x) {
+  data.frame(
+    bin = x[1],
+    lineage = x[2],
+    completeness = as.numeric(x[13]),
+    contamination = as.numeric(x[14])
+  )
+}))
+
+checkm_df
+```
+
+```{r}
+JoinedTable <- checkm_df |> 
+  left_join(gtdbtkTABLE, by = c("bin" = "user_genome"))
+
+
+```
+
+
+
+Estimated completeness of genome bins recovered from the black band disease metagenome, calculated using CheckM.
+```{r figure2-bin-completeness, echo=FALSE, message=FALSE, warning=FALSE, fig.width=8, fig.height=6}
+
+checkm_top <- JoinedTable |>
+  filter(completeness > 15) |>
+  arrange(completeness)
+
+ggplot(
+  checkm_top,
+  aes(
+    x = completeness,
+    y = reorder(short_classification, completeness)
+  )
+) +
+  geom_col(
+    fill = "black",
+    width = 0.7
+  ) +
+  geom_text(
+    aes(label = paste0(round(completeness, 1), "%")),
+    hjust = -0.15,
+    size = 3.5
+  ) +
+  scale_x_continuous(
+    limits = c(0, 105),
+    breaks = seq(0, 100, 20),
+    expand = expansion(mult = c(0, 0))
+  ) +
+  labs(
+    x = "Genome completeness (%)",
+    y = NULL
+  ) +
+  theme_classic(base_size = 12) +
+  theme(
+    axis.text = element_text(colour = "black"),
+    axis.title = element_text(colour = "black")
+  )
+```
+
+
+Summary on the results of PROKKA and MINIPATH annotation... TO answer how many genes were identified by Prokka? How many were assigned an EC number?
+```{r}
+
+```
+
+

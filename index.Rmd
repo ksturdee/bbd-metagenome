@@ -58,3 +58,8 @@ If you add a step file, add a heading and a child chunk for it below.
 
 ```{r, child = "06_metabolic_pathways.Rmd"}
 ```
+
+# Code for results
+
+```{r, child = "07_final_results.Rmd"}
+```
