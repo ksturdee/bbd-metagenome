@@ -86,8 +86,8 @@ figure1 <- ggplot(gc_df, aes(x = GC)) +
   ) +
   theme_classic(base_size = 12) +
   theme(
-    plot.background = element_rect(fill = "#f9f9f6", colour = NA),
-    panel.background = element_rect(fill = "#f9f9f6", colour = NA),
+    panel.background = element_rect(fill = "transparent", colour = NA),
+    plot.background = element_rect(fill = "transparent", colour = NA),
     axis.text = element_text(colour = "black"),
     axis.title = element_text(colour = "black")
   )
