@@ -24,10 +24,8 @@ bash chunk. R chunks run from the top of the repository.
 
 Metabolic pathways inferred from the Prokka annotations with MinPath. Commands for this step were run in `minpath/`.
 
-Change directory. Investigate a single bin (`metabat.30`)
+Start by investigating a single bin (`metabat.30`)
 ```{bash}
-cd ~/bbd-metagenome/minpath
-
 head ../prokka/metabat.30/metabat.30.tsv
 ```
 For input to minpath we only want to keep a unique ID for each gene (column 1) and its EC number (column 5). Must transform the tsv into this format using awk:

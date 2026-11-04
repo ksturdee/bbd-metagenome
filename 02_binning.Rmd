@@ -17,20 +17,7 @@ knitr::opts_hooks$set(engine = function(options) {
 })
 ```
 
-```{=html}
-<!--
-Explain what this step does and why, and copy each command you ran into a
-bash chunk. R chunks run from the top of the repository.
--->
-```
-
 Binning of the assembled contigs into genomes with MetaBAT 2. Commands for this step were run in `metabat/`.
-
-Change directory to the metabat folder:
-
-```{bash}
-cd ~/bbd-metagenome/metabat
-```
 
 Extract depth information, reorder contigs based on depth, and run metabat.
 

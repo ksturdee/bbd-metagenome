@@ -28,11 +28,9 @@ Gene prediction and annotation of the most complete bins with Prokka. Commands f
 
 The goal here is to assess the genes present within the genomes of bbd taxa within the mat to further our understanding of metabolic processes present. Prokka will identify the gene sequences and identify homologous genes with known functions.
 
-Change directory. Look at bins, select a test one to run Prokka.
+Look at bins, select a test one to run Prokka.
 
 ```{bash}
-cd ~/bbd-metagenome/prokka
-
 cat ../checkm/bbd_topbins.txt
 ```
 

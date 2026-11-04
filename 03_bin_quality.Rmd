@@ -24,11 +24,9 @@ bash chunk. R chunks run from the top of the repository.
 
 Completeness and contamination of each bin, estimated with CheckM, and selection of the most complete bins for further analysis. Commands for this step were run in `checkm/`.
 
-Check bin quality using checkm. First change directory to checkm.
+Check bin quality using checkm.
 
 ```{bash}
-cd ~/bbd-metagenome/checkm
-
 cat ../flye/bbd/assembly.fasta | bioawk -c fastx '{print length($seq),$name}' | sort -n
 ```
 

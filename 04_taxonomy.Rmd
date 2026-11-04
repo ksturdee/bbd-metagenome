@@ -24,10 +24,8 @@ bash chunk. R chunks run from the top of the repository.
 
 Taxonomic classification of the most complete bins with GTDB-Tk. Commands for this step were run in `gtdbtk/`.
 
-Change directory to the gtdbtk folder:
+Setup loop to read bins:
 ```{bash}
-cd ~/bbd-metagenome/gtdbtk
-
 while read bin;do echo $bin;done < ../checkm/bbd_topbins.txt
 
 while read bin;do echo "../metabat/bins_bbd/${bin}.fa";done < ../checkm/bbd_topbins.txt
