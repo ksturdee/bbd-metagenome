@@ -1912,6 +1912,573 @@ Halarcobacter. However the evidence for this was weak; only 1/3 of the
 expected gene families were detected and minipath did not retain the
 pathway.</p>
 </div>
+<div id="data-clean-up-and-visualization" class="section level1">
+<h1>Data clean-up and visualization</h1>
+<div id="assembly-summary" class="section level3">
+<h3>Assembly summary</h3>
+<p>Summary statistics were calculated from the final black band disease
+(BBD) metagenome assembly generated with Flye. These metrics describe
+the overall size and contiguity of the assembly:</p>
+<pre class="r"><code>assembly &lt;- readDNAStringSet(&quot;flye/bbd/assembly.fasta&quot;)
+
+contig_lengths &lt;- width(assembly)
+sorted_lengths &lt;- sort(contig_lengths, decreasing = TRUE)
+
+cumulative_length &lt;- cumsum(sorted_lengths)
+
+n50 &lt;- sorted_lengths[
+  which(cumulative_length &gt;= sum(sorted_lengths) / 2)[1]
+]
+
+assembly_table &lt;- tibble(
+  Metric = c(
+    &quot;Total assembly length&quot;,
+    &quot;Number of contigs&quot;,
+    &quot;N50&quot;,
+    &quot;Longest contig&quot;,
+    &quot;Mean contig length&quot;,
+    &quot;Median contig length&quot;
+  ),
+  Value = c(
+    paste0(round(sum(contig_lengths) / 1e6, 2), &quot; Mb&quot;),
+    format(length(contig_lengths), big.mark = &quot;,&quot;),
+    paste0(format(n50, big.mark = &quot;,&quot;), &quot; bp&quot;),
+    paste0(format(max(contig_lengths), big.mark = &quot;,&quot;), &quot; bp&quot;),
+    paste0(format(round(mean(contig_lengths)), big.mark = &quot;,&quot;), &quot; bp&quot;),
+    paste0(format(round(median(contig_lengths)), big.mark = &quot;,&quot;), &quot; bp&quot;)
+  )
+)
+
+kable(
+  assembly_table,
+  caption = &quot;Table 1. Summary statistics for the BBD metagenome assembly generated with Flye.&quot;,
+  align = c(&quot;l&quot;, &quot;r&quot;)
+)</code></pre>
+<table>
+<caption>Table 1. Summary statistics for the BBD metagenome assembly
+generated with Flye.</caption>
+<thead>
+<tr class="header">
+<th align="left">Metric</th>
+<th align="right">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Total assembly length</td>
+<td align="right">66.6 Mb</td>
+</tr>
+<tr class="even">
+<td align="left">Number of contigs</td>
+<td align="right">7,974</td>
+</tr>
+<tr class="odd">
+<td align="left">N50</td>
+<td align="right">13,007 bp</td>
+</tr>
+<tr class="even">
+<td align="left">Longest contig</td>
+<td align="right">4,706,701 bp</td>
+</tr>
+<tr class="odd">
+<td align="left">Mean contig length</td>
+<td align="right">8,352 bp</td>
+</tr>
+<tr class="even">
+<td align="left">Median contig length</td>
+<td align="right">3,985 bp</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="gc-content" class="section level3">
+<h3>GC content</h3>
+<p>GC content was calculated for each assembled contig to describe
+variation in nucleotide composition across the metagenome:</p>
+<pre class="r"><code>gc_content &lt;- letterFrequency(
+  assembly,
+  letters = c(&quot;G&quot;, &quot;C&quot;)
+)
+
+gc_df &lt;- tibble(
+  GC = rowSums(gc_content) / width(assembly)
+)
+
+figure1 &lt;- ggplot(gc_df, aes(x = GC)) +
+  geom_histogram(
+    binwidth = 0.025,
+    fill = &quot;black&quot;,
+    colour = &quot;#f9f9f6&quot;,
+    linewidth = 0.3
+  ) +
+  labs(
+    x = &quot;GC content&quot;,
+    y = &quot;Number of contigs&quot;
+  ) +
+  theme_classic(base_size = 12) +
+  theme(
+    plot.background = element_rect(fill = &quot;#f9f9f6&quot;, colour = NA),
+    panel.background = element_rect(fill = &quot;#f9f9f6&quot;, colour = NA),
+    axis.text = element_text(colour = &quot;black&quot;),
+    axis.title = element_text(colour = &quot;black&quot;)
+  )</code></pre>
+<p>Figure 1. Distribution of GC content among contigs in the BBD
+metagenome assembly.</p>
+</div>
+<div id="genome-quality-and-taxonomic-classification" class="section level3">
+<h3>Genome quality and taxonomic classification</h3>
+<p>Genome-bin completeness and contamination were obtained from CheckM,
+while taxonomic classifications were obtained from GTDB-Tk. These
+results were combined to identify the major genome components recovered
+from the BBD metagenome:</p>
+<pre class="r"><code>gtdbtk &lt;- read_tsv(
+  &quot;gtdbtk/gtdbtk.bac120.summary.tsv&quot;,
+  show_col_types = FALSE
+)
+
+gtdbtk_taxonomy &lt;- gtdbtk |&gt;
+  separate_wider_delim(
+    classification,
+    delim = &quot;;&quot;,
+    names = c(
+      &quot;domain&quot;,
+      &quot;phylum&quot;,
+      &quot;class&quot;,
+      &quot;order&quot;,
+      &quot;family&quot;,
+      &quot;genus&quot;,
+      &quot;species&quot;
+    )
+  ) |&gt;
+  mutate(
+    across(
+      c(domain, phylum, class, order, family, genus, species),
+      ~ str_remove(.x, &quot;^[a-z]__&quot;)
+    )
+  ) |&gt;
+  select(
+    user_genome,
+    domain,
+    phylum,
+    class,
+    order,
+    family,
+    genus,
+    species
+  )</code></pre>
+<pre class="r"><code>checkm_lines &lt;- readLines(
+  &quot;checkm/checkm_results_bbd.txt&quot;
+)
+
+checkm_lines &lt;- checkm_lines[
+  grepl(
+    &quot;^(contig_|metabat\\.)&quot;,
+    trimws(checkm_lines)
+  )
+]
+
+checkm_split &lt;- strsplit(
+  trimws(checkm_lines),
+  &quot;\\s+&quot;
+)
+
+checkm_df &lt;- do.call(
+  rbind,
+  lapply(checkm_split, function(x) {
+    data.frame(
+      bin = x[1],
+      lineage = x[2],
+      completeness = as.numeric(x[13]),
+      contamination = as.numeric(x[14])
+    )
+  })
+)</code></pre>
+<pre class="r"><code>genome_summary &lt;- checkm_df |&gt;
+  left_join(
+    gtdbtk_taxonomy,
+    by = c(&quot;bin&quot; = &quot;user_genome&quot;)
+  ) |&gt;
+  mutate(
+    taxon = case_when(
+      !is.na(species) &amp; species != &quot;&quot; ~ species,
+      !is.na(genus) &amp; genus != &quot;&quot; ~ paste0(genus, &quot; sp.&quot;),
+      !is.na(family) &amp; family != &quot;&quot; ~ family,
+      !is.na(order) &amp; order != &quot;&quot; ~ order,
+      !is.na(class) &amp; class != &quot;&quot; ~ class,
+      !is.na(phylum) &amp; phylum != &quot;&quot; ~ phylum,
+      TRUE ~ &quot;Unclassified&quot;
+    ),
+    taxon_label = paste0(taxon, &quot; (&quot;, bin, &quot;)&quot;)
+  )</code></pre>
+<div id="genome-completeness" class="section level4">
+<h4>Genome completeness</h4>
+<p>Only genome bins with greater than 15% estimated completeness, which
+were retained for downstream taxonomic and functional analysis, are
+shown.</p>
+<pre class="r"><code>genome_top &lt;- genome_summary |&gt;
+  filter(completeness &gt; 15) |&gt;
+  arrange(completeness)
+
+figure2 &lt;- ggplot(
+  genome_top,
+  aes(
+    x = completeness,
+    y = reorder(taxon_label, completeness)
+  )
+) +
+  geom_col(
+    fill = &quot;black&quot;,
+    width = 0.65
+  ) +
+  geom_text(
+    aes(label = paste0(round(completeness, 1), &quot;%&quot;)),
+    hjust = -0.2,
+    size = 3.3,
+    colour = &quot;black&quot;
+  ) +
+  scale_x_continuous(
+    limits = c(0, 108),
+    breaks = seq(0, 100, 20),
+    expand = expansion(mult = c(0, 0))
+  ) +
+  labs(
+    x = &quot;Genome completeness (%)&quot;,
+    y = NULL
+  ) +
+  theme_classic(base_size = 12) +
+  theme(
+    # Match ePortfolio background
+    plot.background = element_rect(
+      fill = &quot;#f9f9f6&quot;,
+      colour = NA
+    ),
+    panel.background = element_rect(
+      fill = &quot;#f9f9f6&quot;,
+      colour = NA
+    ),
+
+    # Clean typography
+    axis.text.x = element_text(
+      colour = &quot;black&quot;,
+      size = 10
+    ),
+    axis.text.y = element_text(
+      colour = &quot;black&quot;,
+      size = 9
+    ),
+    axis.title.x = element_text(
+      colour = &quot;black&quot;,
+      size = 11,
+      margin = margin(t = 10)
+    ),
+
+    # Clean spacing
+    axis.ticks.y = element_blank(),
+    plot.margin = margin(10, 20, 10, 10)
+  )</code></pre>
+<p>Figure 2. Estimated completeness of genome bins of the BBD
+metagenome. Taxonomic labels represent the lowest classification
+assigned by GTDB-Tk. Only bins with &gt;15% estimated completeness are
+shown.</p>
+</div>
+</div>
+<div id="major-genome-components" class="section level3">
+<h3>Major genome components</h3>
+<pre class="r"><code>taxonomy_table &lt;- genome_top |&gt;
+  arrange(desc(completeness)) |&gt;
+  transmute(
+    Bin = bin,
+    Taxon = taxon,
+    Phylum = phylum,
+    `Completeness (%)` = round(completeness, 2),
+    `Contamination (%)` = round(contamination, 2)
+  )
+
+kable(
+  taxonomy_table,
+  caption = &quot;Table 2. Quality and taxonomic classification of genome bins&quot;,
+  align = c(&quot;l&quot;, &quot;l&quot;, &quot;l&quot;, &quot;r&quot;, &quot;r&quot;)
+)</code></pre>
+<table>
+<caption>Table 2. Quality and taxonomic classification of genome
+bins</caption>
+<colgroup>
+<col width="12%" />
+<col width="28%" />
+<col width="20%" />
+<col width="18%" />
+<col width="19%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">Bin</th>
+<th align="left">Taxon</th>
+<th align="left">Phylum</th>
+<th align="right">Completeness (%)</th>
+<th align="right">Contamination (%)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">contig_120</td>
+<td align="left">UBA2561 sp002340355</td>
+<td align="left">Bacteroidota</td>
+<td align="right">97.62</td>
+<td align="right">1.64</td>
+</tr>
+<tr class="even">
+<td align="left">metabat.42</td>
+<td align="left">Roseofilum reptotaenium_A</td>
+<td align="left">Cyanobacteria</td>
+<td align="right">97.50</td>
+<td align="right">0.67</td>
+</tr>
+<tr class="odd">
+<td align="left">metabat.52</td>
+<td align="left">Halarcobacter sp.</td>
+<td align="left">Campylobacterota</td>
+<td align="right">34.48</td>
+<td align="right">0.00</td>
+</tr>
+<tr class="even">
+<td align="left">metabat.30</td>
+<td align="left">JABXKX01 sp.</td>
+<td align="left">Firmicutes_A</td>
+<td align="right">32.51</td>
+<td align="right">1.77</td>
+</tr>
+<tr class="odd">
+<td align="left">metabat.12</td>
+<td align="left">Halarcobacter sp.</td>
+<td align="left">Campylobacterota</td>
+<td align="right">30.28</td>
+<td align="right">0.00</td>
+</tr>
+<tr class="even">
+<td align="left">metabat.44</td>
+<td align="left">Desulforegulaceae</td>
+<td align="left">Desulfobacterota</td>
+<td align="right">28.18</td>
+<td align="right">0.13</td>
+</tr>
+<tr class="odd">
+<td align="left">metabat.15</td>
+<td align="left">Vallitaleaceae</td>
+<td align="left">Firmicutes_A</td>
+<td align="right">23.38</td>
+<td align="right">0.00</td>
+</tr>
+<tr class="even">
+<td align="left">metabat.14</td>
+<td align="left">Poseidonibacter sp.</td>
+<td align="left">Campylobacterota</td>
+<td align="right">23.28</td>
+<td align="right">0.00</td>
+</tr>
+<tr class="odd">
+<td align="left">metabat.39</td>
+<td align="left">Maridesulfovibrio sp.</td>
+<td align="left">Desulfobacterota_I</td>
+<td align="right">22.41</td>
+<td align="right">0.00</td>
+</tr>
+<tr class="even">
+<td align="left">metabat.41</td>
+<td align="left">Desulforegulaceae</td>
+<td align="left">Desulfobacterota</td>
+<td align="right">21.43</td>
+<td align="right">0.00</td>
+</tr>
+<tr class="odd">
+<td align="left">metabat.19</td>
+<td align="left">Desulforegulaceae</td>
+<td align="left">Desulfobacterota</td>
+<td align="right">20.79</td>
+<td align="right">0.00</td>
+</tr>
+<tr class="even">
+<td align="left">metabat.6</td>
+<td align="left">Sulfurospirillum_A sp.</td>
+<td align="left">Campylobacterota</td>
+<td align="right">19.98</td>
+<td align="right">0.00</td>
+</tr>
+<tr class="odd">
+<td align="left">metabat.54</td>
+<td align="left">Saprospira sp.</td>
+<td align="left">Bacteroidota</td>
+<td align="right">17.24</td>
+<td align="right">0.00</td>
+</tr>
+<tr class="even">
+<td align="left">metabat.65</td>
+<td align="left">Vallitaleaceae</td>
+<td align="left">Firmicutes_A</td>
+<td align="right">15.79</td>
+<td align="right">0.00</td>
+</tr>
+<tr class="odd">
+<td align="left">metabat.37</td>
+<td align="left">Halarcobacter sp.</td>
+<td align="left">Campylobacterota</td>
+<td align="right">15.67</td>
+<td align="right">0.00</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="gene-annotation-1" class="section level2">
+<h2>Gene annotation</h2>
+<pre class="r"><code>bins &lt;- readLines(
+  &quot;checkm/bbd_topbins.txt&quot;
+)
+
+prokka_all &lt;- map_dfr(
+  bins,
+  function(bin) {
+    read_tsv(
+      paste0(
+        &quot;prokka/&quot;,
+        bin,
+        &quot;/&quot;,
+        bin,
+        &quot;.tsv&quot;
+      ),
+      show_col_types = FALSE
+    ) |&gt;
+      mutate(bin = bin)
+  }
+)
+
+total_features &lt;- nrow(prokka_all)
+
+genes_with_ec &lt;- prokka_all |&gt;
+  filter(
+    !is.na(EC_number),
+    EC_number != &quot;&quot;
+  ) |&gt;
+  nrow()
+
+ec_percent &lt;- (
+  genes_with_ec /
+  total_features
+) * 100
+
+prokka_summary &lt;- tibble(
+  Metric = c(
+    &quot;Features annotated by Prokka&quot;,
+    &quot;Features assigned an EC number&quot;,
+    &quot;Features with an EC assignment&quot;
+  ),
+  Value = c(
+    format(total_features, big.mark = &quot;,&quot;),
+    format(genes_with_ec, big.mark = &quot;,&quot;),
+    paste0(round(ec_percent, 1), &quot;%&quot;)
+  )
+)
+
+kable(
+  prokka_summary,
+  align = c(&quot;l&quot;, &quot;r&quot;)
+)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="left">Metric</th>
+<th align="right">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Features annotated by Prokka</td>
+<td align="right">20,474</td>
+</tr>
+<tr class="even">
+<td align="left">Features assigned an EC number</td>
+<td align="right">5,244</td>
+</tr>
+<tr class="odd">
+<td align="left">Features with an EC assignment</td>
+<td align="right">25.6%</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="metabolic-pathway-analysis" class="section level2">
+<h2>Metabolic pathway analysis</h2>
+<pre class="r"><code>pathway_table &lt;- tribble(
+  ~Bin, ~Taxon, ~Pathway, ~`Families detected`, ~MinPath,
+  &quot;contig_120&quot;, &quot;UBA2561 sp002340355&quot;, &quot;PWY-101&quot;, &quot;1/4&quot;, 0,
+  &quot;metabat.15&quot;, &quot;Vallitaleaceae&quot;, &quot;PWY-101&quot;, &quot;1/4&quot;, 1,
+  &quot;metabat.41&quot;, &quot;Desulforegulaceae&quot;, &quot;PWY-101&quot;, &quot;1/4&quot;, 0,
+  &quot;metabat.42&quot;, &quot;Roseofilum reptotaenium_A&quot;, &quot;PWY-101&quot;, &quot;4/4&quot;, 1,
+  &quot;metabat.12&quot;, &quot;Halarcobacter sp.&quot;, &quot;PWY-5360&quot;, &quot;1/3&quot;, 0
+)
+
+kable(
+  pathway_table,
+  caption = &quot;Table 3. Detection of selected metabolic pathways within genome bins from the BBD metagenome.&quot;,
+  align = c(&quot;l&quot;, &quot;l&quot;, &quot;l&quot;, &quot;c&quot;, &quot;c&quot;)
+)</code></pre>
+<table style="width:100%;">
+<caption>Table 3. Detection of selected metabolic pathways within genome
+bins from the BBD metagenome.</caption>
+<colgroup>
+<col width="14%" />
+<col width="35%" />
+<col width="12%" />
+<col width="25%" />
+<col width="12%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">Bin</th>
+<th align="left">Taxon</th>
+<th align="left">Pathway</th>
+<th align="center">Families detected</th>
+<th align="center">MinPath</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">contig_120</td>
+<td align="left">UBA2561 sp002340355</td>
+<td align="left">PWY-101</td>
+<td align="center">1/4</td>
+<td align="center">0</td>
+</tr>
+<tr class="even">
+<td align="left">metabat.15</td>
+<td align="left">Vallitaleaceae</td>
+<td align="left">PWY-101</td>
+<td align="center">1/4</td>
+<td align="center">1</td>
+</tr>
+<tr class="odd">
+<td align="left">metabat.41</td>
+<td align="left">Desulforegulaceae</td>
+<td align="left">PWY-101</td>
+<td align="center">1/4</td>
+<td align="center">0</td>
+</tr>
+<tr class="even">
+<td align="left">metabat.42</td>
+<td align="left">Roseofilum reptotaenium_A</td>
+<td align="left">PWY-101</td>
+<td align="center">4/4</td>
+<td align="center">1</td>
+</tr>
+<tr class="odd">
+<td align="left">metabat.12</td>
+<td align="left">Halarcobacter sp.</td>
+<td align="left">PWY-5360</td>
+<td align="center">1/3</td>
+<td align="center">0</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 
 
 

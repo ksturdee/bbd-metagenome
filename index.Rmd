@@ -59,7 +59,7 @@ If you add a step file, add a heading and a child chunk for it below.
 ```{r, child = "06_metabolic_pathways.Rmd"}
 ```
 
-# Code for results
+# Data clean-up and visualization
 
-```{r, child = "07_final_results.Rmd"}
+```{r, child = "07_Data_Visualization.Rmd"}
 ```

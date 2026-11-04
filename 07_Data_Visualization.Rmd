@@ -21,24 +21,21 @@ library(tidyverse)
 library(knitr)
 ```
 
-
-## Table 1
-General summary metrics on the assembly
-```{r}
-# Read Flye assembly
+### Assembly summary
+Summary statistics were calculated from the final black band disease (BBD) metagenome assembly generated with Flye. These metrics describe the overall size and contiguity of the assembly:
+```{r assembly-summary}
 assembly <- readDNAStringSet("flye/bbd/assembly.fasta")
-# Calculate contig lengths
+
 contig_lengths <- width(assembly)
 sorted_lengths <- sort(contig_lengths, decreasing = TRUE)
 
-# Calculate N50
 cumulative_length <- cumsum(sorted_lengths)
+
 n50 <- sorted_lengths[
   which(cumulative_length >= sum(sorted_lengths) / 2)[1]
 ]
 
-# Create Table 1
-assembly_table <- data.frame(
+assembly_table <- tibble(
   Metric = c(
     "Total assembly length",
     "Number of contigs",
@@ -57,107 +54,160 @@ assembly_table <- data.frame(
   )
 )
 
-knitr::kable(
+kable(
   assembly_table,
-  caption = "Table 1. Summary statistics for the black band disease metagenome assembly generated with Flye.",
+  caption = "Table 1. Summary statistics for the BBD metagenome assembly generated with Flye.",
   align = c("l", "r")
 )
 ```
 
-
-To answer "what organisms make up the largest components of the assembly?" -- RESULTS FROM GTD
-```{r}
-gtdbtk <- read_tsv("gtdbtk/gtdbtk.bac120.summary.tsv")
-
-gtdbtkTABLE <- gtdbtk |> separate_longer_delim(classification, delim = ";") |>
-  group_by(user_genome) |>
-  slice_tail(n=3) |>
-  summarise(short_classification = paste(classification, collapse =""))
-
-gtdbtkTABLE
-
-```
-
-## GC content
-
-```{r figure1-gc, echo=FALSE, message=FALSE, warning=FALSE, fig.width=8, fig.height=5}
-
-gc_content <- letterFrequency(assembly, letters = c("G", "C"))
+### GC content
+GC content was calculated for each assembled contig to describe variation in nucleotide composition across the metagenome:
+```{r gc-distribution}
+gc_content <- letterFrequency(
+  assembly,
+  letters = c("G", "C")
+)
 
 gc_df <- tibble(
   GC = rowSums(gc_content) / width(assembly)
 )
 
-ggplot(gc_df, aes(x = GC)) +
+figure1 <- ggplot(gc_df, aes(x = GC)) +
   geom_histogram(
     binwidth = 0.025,
     fill = "black",
-    colour = "white"
+    colour = "#f9f9f6",
+    linewidth = 0.3
   ) +
   labs(
     x = "GC content",
     y = "Number of contigs"
   ) +
-  theme_classic(base_size = 12)
+  theme_classic(base_size = 12) +
+  theme(
+    plot.background = element_rect(fill = "#f9f9f6", colour = NA),
+    panel.background = element_rect(fill = "#f9f9f6", colour = NA),
+    axis.text = element_text(colour = "black"),
+    axis.title = element_text(colour = "black")
+  )
 ```
+Figure 1.  Distribution of GC content among contigs in the BBD metagenome assembly.
 
-```{r}
-checkm_lines <- readLines("checkm/checkm_results_bbd.txt")
+### Genome quality and taxonomic classification
+Genome-bin completeness and contamination were obtained from CheckM, while taxonomic classifications were obtained from GTDB-Tk. These results were combined to identify the major genome components recovered from the BBD metagenome:
+```{r taxonomy-data}
+gtdbtk <- read_tsv(
+  "gtdbtk/gtdbtk.bac120.summary.tsv",
+  show_col_types = FALSE
+)
 
-# Keep actual bin-result lines only
+gtdbtk_taxonomy <- gtdbtk |>
+  separate_wider_delim(
+    classification,
+    delim = ";",
+    names = c(
+      "domain",
+      "phylum",
+      "class",
+      "order",
+      "family",
+      "genus",
+      "species"
+    )
+  ) |>
+  mutate(
+    across(
+      c(domain, phylum, class, order, family, genus, species),
+      ~ str_remove(.x, "^[a-z]__")
+    )
+  ) |>
+  select(
+    user_genome,
+    domain,
+    phylum,
+    class,
+    order,
+    family,
+    genus,
+    species
+  )
+```
+```{r checkm-data}
+checkm_lines <- readLines(
+  "checkm/checkm_results_bbd.txt"
+)
+
 checkm_lines <- checkm_lines[
-  grepl("^(contig_|metabat\\.)", trimws(checkm_lines))
+  grepl(
+    "^(contig_|metabat\\.)",
+    trimws(checkm_lines)
+  )
 ]
 
-# Split whitespace-delimited CheckM output
-checkm_split <- strsplit(trimws(checkm_lines), "\\s+")
+checkm_split <- strsplit(
+  trimws(checkm_lines),
+  "\\s+"
+)
 
-checkm_df <- do.call(rbind, lapply(checkm_split, function(x) {
-  data.frame(
-    bin = x[1],
-    lineage = x[2],
-    completeness = as.numeric(x[13]),
-    contamination = as.numeric(x[14])
+checkm_df <- do.call(
+  rbind,
+  lapply(checkm_split, function(x) {
+    data.frame(
+      bin = x[1],
+      lineage = x[2],
+      completeness = as.numeric(x[13]),
+      contamination = as.numeric(x[14])
+    )
+  })
+)
+```
+```{r join-quality-taxonomy}
+genome_summary <- checkm_df |>
+  left_join(
+    gtdbtk_taxonomy,
+    by = c("bin" = "user_genome")
+  ) |>
+  mutate(
+    taxon = case_when(
+      !is.na(species) & species != "" ~ species,
+      !is.na(genus) & genus != "" ~ paste0(genus, " sp."),
+      !is.na(family) & family != "" ~ family,
+      !is.na(order) & order != "" ~ order,
+      !is.na(class) & class != "" ~ class,
+      !is.na(phylum) & phylum != "" ~ phylum,
+      TRUE ~ "Unclassified"
+    ),
+    taxon_label = paste0(taxon, " (", bin, ")")
   )
-}))
-
-checkm_df
 ```
 
-```{r}
-JoinedTable <- checkm_df |> 
-  left_join(gtdbtkTABLE, by = c("bin" = "user_genome"))
-
-
-```
-
-
-
-Estimated completeness of genome bins recovered from the black band disease metagenome, calculated using CheckM.
-```{r figure2-bin-completeness, echo=FALSE, message=FALSE, warning=FALSE, fig.width=8, fig.height=6}
-
-checkm_top <- JoinedTable |>
+#### Genome completeness
+Only genome bins with greater than 15% estimated completeness, which were retained for downstream taxonomic and functional analysis, are shown.
+```{r genome-completeness, fig.width=9, fig.height=7}
+genome_top <- genome_summary |>
   filter(completeness > 15) |>
   arrange(completeness)
 
-ggplot(
-  checkm_top,
+figure2 <- ggplot(
+  genome_top,
   aes(
     x = completeness,
-    y = reorder(short_classification, completeness)
+    y = reorder(taxon_label, completeness)
   )
 ) +
   geom_col(
     fill = "black",
-    width = 0.7
+    width = 0.65
   ) +
   geom_text(
     aes(label = paste0(round(completeness, 1), "%")),
-    hjust = -0.15,
-    size = 3.5
+    hjust = -0.2,
+    size = 3.3,
+    colour = "black"
   ) +
   scale_x_continuous(
-    limits = c(0, 105),
+    limits = c(0, 108),
     breaks = seq(0, 100, 20),
     expand = expansion(mult = c(0, 0))
   ) +
@@ -167,15 +217,126 @@ ggplot(
   ) +
   theme_classic(base_size = 12) +
   theme(
-    axis.text = element_text(colour = "black"),
-    axis.title = element_text(colour = "black")
+    # Match ePortfolio background
+    plot.background = element_rect(
+      fill = "#f9f9f6",
+      colour = NA
+    ),
+    panel.background = element_rect(
+      fill = "#f9f9f6",
+      colour = NA
+    ),
+
+    # Clean typography
+    axis.text.x = element_text(
+      colour = "black",
+      size = 10
+    ),
+    axis.text.y = element_text(
+      colour = "black",
+      size = 9
+    ),
+    axis.title.x = element_text(
+      colour = "black",
+      size = 11,
+      margin = margin(t = 10)
+    ),
+
+    # Clean spacing
+    axis.ticks.y = element_blank(),
+    plot.margin = margin(10, 20, 10, 10)
   )
 ```
+Figure 2. Estimated completeness of genome bins of the BBD metagenome. Taxonomic labels represent the lowest classification assigned by GTDB-Tk. Only bins with >15% estimated completeness are shown.
 
+### Major genome components
+```{r taxonomy-summary-table}
+taxonomy_table <- genome_top |>
+  arrange(desc(completeness)) |>
+  transmute(
+    Bin = bin,
+    Taxon = taxon,
+    Phylum = phylum,
+    `Completeness (%)` = round(completeness, 2),
+    `Contamination (%)` = round(contamination, 2)
+  )
 
-Summary on the results of PROKKA and MINIPATH annotation... TO answer how many genes were identified by Prokka? How many were assigned an EC number?
-```{r}
-
+kable(
+  taxonomy_table,
+  caption = "Table 2. Quality and taxonomic classification of genome bins",
+  align = c("l", "l", "l", "r", "r")
+)
 ```
 
+## Gene annotation
+```{r prokka-summary}
+bins <- readLines(
+  "checkm/bbd_topbins.txt"
+)
 
+prokka_all <- map_dfr(
+  bins,
+  function(bin) {
+    read_tsv(
+      paste0(
+        "prokka/",
+        bin,
+        "/",
+        bin,
+        ".tsv"
+      ),
+      show_col_types = FALSE
+    ) |>
+      mutate(bin = bin)
+  }
+)
+
+total_features <- nrow(prokka_all)
+
+genes_with_ec <- prokka_all |>
+  filter(
+    !is.na(EC_number),
+    EC_number != ""
+  ) |>
+  nrow()
+
+ec_percent <- (
+  genes_with_ec /
+  total_features
+) * 100
+
+prokka_summary <- tibble(
+  Metric = c(
+    "Features annotated by Prokka",
+    "Features assigned an EC number",
+    "Features with an EC assignment"
+  ),
+  Value = c(
+    format(total_features, big.mark = ","),
+    format(genes_with_ec, big.mark = ","),
+    paste0(round(ec_percent, 1), "%")
+  )
+)
+
+kable(
+  prokka_summary,
+  align = c("l", "r")
+)
+```
+## Metabolic pathway analysis
+```{r pathway-summary}
+pathway_table <- tribble(
+  ~Bin, ~Taxon, ~Pathway, ~`Families detected`, ~MinPath,
+  "contig_120", "UBA2561 sp002340355", "PWY-101", "1/4", 0,
+  "metabat.15", "Vallitaleaceae", "PWY-101", "1/4", 1,
+  "metabat.41", "Desulforegulaceae", "PWY-101", "1/4", 0,
+  "metabat.42", "Roseofilum reptotaenium_A", "PWY-101", "4/4", 1,
+  "metabat.12", "Halarcobacter sp.", "PWY-5360", "1/3", 0
+)
+
+kable(
+  pathway_table,
+  caption = "Table 3. Detection of selected metabolic pathways within genome bins from the BBD metagenome.",
+  align = c("l", "l", "l", "c", "c")
+)
+```
