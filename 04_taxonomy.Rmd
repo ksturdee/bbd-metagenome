@@ -22,9 +22,9 @@ Explain what this step does and why, and copy each command you ran into a
 bash chunk. R chunks run from the top of the repository.
 -->
 
-Taxonomic classification of the most complete bins with GTDB-Tk. Commands for this step were run in `gtdbtk/`.
+Taxonomic classification of the most complete bins, following the CheckM quality assessment, were classified using `GTDB-Tk.` Commands for this step were run from the `gtdbtk/` directory. 
 
-Setup loop to read bins:
+To prepare the genomes for classification, the list of bins retained during the CheckM assessment were used to copy the corresponding genome FASTA files into the `GTDB-Tk` input directory:
 ```{bash}
 while read bin;do echo $bin;done < ../checkm/bbd_topbins.txt
 
@@ -33,39 +33,11 @@ while read bin;do echo "../metabat/bins_bbd/${bin}.fa";done < ../checkm/bbd_topb
 while read bin;do cp "../metabat/bins_bbd/${bin}.fa" genomes;done < ../checkm/bbd_topbins.txt
 ```
 
-Should see one file for each of the bins:
-```{bash}
-ls genomes
-```
-
-Create a slurm script to run gtdbtk.
-```{bash}
-#!/bin/bash
-#SBATCH --time=120
-#SBATCH --ntasks=2 --mem=56gb
-
-echo "Starting gtdbtk in $(pwd) at $(date)"
-
-shopt -s expand_aliases
-alias gtdbtk='apptainer run -B /pvol:/pvol,/pvol/data/mg/gtdbtkdata/release207_v2/:/refdata /pvol/data/sif/gtdbtk.sif'
-
-gtdbtk classify_wf -x fa --cpus 2 --genome_dir genomes --out_dir out --skip_ani_screen
-
-echo "Finished gtdbtk in $(pwd) at $(date)"
-```
-
-Submit the job (487):
+`GTDB-Tk` was run using the slurm script `run_gtdbtk.sh` within `/gtdbtk`, and the output was confirmed and moved from the output directory into the main `gtdbtl/` directory for further analysis: 
 ```{bash}
 sbatch run_gtdbtk.sh
-```
 
-Confirm output.
-```{bash}
 ls -l out/gtdbtk.bac120.summary.tsv
-```
 
-Move output.
-```{bash}
 cp out/gtdbtk.bac120.summary.tsv .
 ```
-

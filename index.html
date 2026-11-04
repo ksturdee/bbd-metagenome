@@ -11,7 +11,7 @@
 
 <meta name="author" content="Kendra" />
 
-<meta name="date" content="2026-11-03" />
+<meta name="date" content="2026-11-04" />
 
 <title>The Metagenome of Black Band Disease</title>
 
@@ -1481,7 +1481,7 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">The Metagenome of Black Band Disease</h1>
 <h4 class="author">Kendra</h4>
-<h4 class="date">2026-11-03</h4>
+<h4 class="date">2026-11-04</h4>
 
 </div>
 
@@ -1500,25 +1500,37 @@ If you add a step file, add a heading and a child chunk for it below.
 Explain what this step does and why, and copy each command you ran into a
 bash chunk. R chunks run from the top of the repository.
 -->
-<p>Assembly of the BBD nanopore reads with Flye. Commands for this step
-were run in <code>flye/</code>.</p>
-<p>Add a symbolic link to the bbd read data:</p>
+<p>Nanopore reads from the black band disease (BBD) metagenome were
+assembled using <code>Flye</code> in metagenome mode. Commands for this
+stage were run from the <code>flye/</code> directory.</p>
+<p>A symbolic link to the BBD nanopore read file was added to ensure
+that the sequencing is accessed without duplicating the large input
+file:</p>
 <pre class="bash"><code>ln -s /pvol/data/metagenome_assembly/bbd_0.1.fastq.gz .</code></pre>
-<p>Create a shell script, run_flye_bbd.sh and submitted the job (446)
-using:</p>
-<pre class="bash"><code>sbatch run_flye_bbd.sh</code></pre>
-<p>Check finished assembly:</p>
-<pre class="bash"><code>ls -l bbd/assembly.fasta</code></pre>
+<p>Then, the <code>flye</code> assembly was run using the slurm shell
+script <code>run_flye_bbd.sh</code>, and the slurm job output was
+assessed:</p>
+<pre class="bash"><code>sbatch run_flye_bbd.sh
+
+ls -l bbd/assembly.fasta</code></pre>
+<p>The completed assembly (written by <code>Flye</code>) was saved to as
+<code>assembly.fasta</code>.</p>
 </div>
 <div id="binning" class="section level1">
 <h1>Binning</h1>
 <p>Binning of the assembled contigs into genomes with MetaBAT 2.
 Commands for this step were run in <code>metabat/</code>.</p>
-<p>Extract depth information, reorder contigs based on depth, and run
-metabat.</p>
-<pre class="bash"><code>cat ../flye/bbd/assembly_info.txt  | grep -v &#39;#&#39; | awk &#39;{OFS=&quot;\t&quot;;print $1,$3}&#39; &gt; depths_bbd.txt
+<p>To assess contig depth, contig names and their sequencing depths were
+extracted from the <code>Flye</code> assembly information file to create
+the depth file required for binning. The assembled contigs were also
+reorder to match the order of contigs in the depth file.</p>
+<pre class="bash"><code>cat ../flye/bbd/assembly_info.txt  | grep -v &#39;#&#39; | 
+
+awk &#39;{OFS=&quot;\t&quot;;print $1,$3}&#39; &gt; depths_bbd.txt
 
 cat depths_bbd.txt | awk &#39;{print $1}&#39; | xargs samtools faidx ../flye/bbd/assembly.fasta &gt; assembly_bbd_ordered.fasta</code></pre>
+<p>Finally, <code>metaBAT 2</code> was used to group the reordered
+contigs into bins based on sequence composition, and contig depth.</p>
 </div>
 <div id="bin-quality" class="section level1">
 <h1>Bin quality</h1>
@@ -1526,35 +1538,23 @@ cat depths_bbd.txt | awk &#39;{print $1}&#39; | xargs samtools faidx ../flye/bbd
 Explain what this step does and why, and copy each command you ran into a
 bash chunk. R chunks run from the top of the repository.
 -->
-<p>Completeness and contamination of each bin, estimated with CheckM,
-and selection of the most complete bins for further analysis. Commands
-for this step were run in <code>checkm/</code>.</p>
-<p>Check bin quality using checkm.</p>
+<p>Completeness and contamination of each bin were estimated with
+<code>CheckM</code>, and the most complete bins were chosen for further
+analysis. Commands for this step were run in <code>checkm/</code>.</p>
+<p>Assembly contigs were sorted by sequence length to find the largest
+contig:</p>
 <pre class="bash"><code>cat ../flye/bbd/assembly.fasta | bioawk -c fastx &#39;{print length($seq),$name}&#39; | sort -n</code></pre>
-<p>Found largest contig in the bbd assembly, it is contig_120 (must
-manually add this contig because it probably isn’t included in the bins
-from metabat).</p>
-<p>Must save the contig_120 as a bin of its own, in the same folder as
-the metabat bins, so that all the later steps treat it just like the
-other bins. Then, must copy all of the bins, including the longest
-contig, into the bins_bbd folder inside checkm.</p>
+<p>The largest contig in the bbd assembly was <code>contig_120</code>.
+This contig must be manually saved as an independent bin, in the same
+folder as the metabat bins, so that all the later steps treat it just
+like the other bins. Then, must copy all of the bins, including
+<code>contig_120</code> into the <code>bins_bbd</code> folder inside
+<code>CheckM</code>.</p>
 <pre class="bash"><code>samtools faidx ../flye/bbd/assembly.fasta contig_120 &gt; ../metabat/bins_bbd/contig_120.fa
 cp ../metabat/bins_bbd/*.fa bins_bbd/</code></pre>
-<p>Create slurm script for the checkm run. Save it within the checkm
-directory as run_checkm_bbd.sh</p>
-<pre class="bash"><code>#!/bin/bash
-#SBATCH --time=60
-#SBATCH --ntasks=6 --mem=40gb
-
-echo &quot;Starting checkm in $(pwd) at $(date)&quot;
-
-shopt -s expand_aliases
-alias checkm=&#39;apptainer run -B /pvol/:/pvol /pvol/data/sif/checkm.sif checkm&#39;
-
-checkm lineage_wf bins_bbd out -t 6 -x fa -f checkm_results_bbd.txt
-
-echo &quot;Finished checkm in $(pwd) at $(date)&quot;</code></pre>
-<p>Submit the checkm job: <code>sbatch run_checkm_bbd.sh</code></p>
+<p>To assess quality with <code>CheckM</code>, the slurm script
+‘run_checkm_bbd.sh’ was created and run:</p>
+<pre class="bash"><code>sbatch run_checkm_bbd.sh</code></pre>
 <div id="functional-analysis-of-the-bbd-metagenome" class="section level2">
 <h2>Functional analysis of the BBD Metagenome</h2>
 <p>The purpose of binning is to sort the metagenome into species and
@@ -1563,7 +1563,7 @@ leveraged to make inferences about metabolic processes present within a
 BBD lesion. Overall, the purpose of this functional analysis is to
 investigate (1) what taxonomic groups of microbes are present, and (2)
 what can they do in terms of genes and biochemical pathways present.</p>
-<p>Check results within checkm_results_bbd</p>
+<p>The results were checked within <code>checkm_results_bbd</code></p>
 <pre class="bash"><code>head checkm_results_bbd.txt </code></pre>
 <p>Marker lineage for top few bins: o__Cytophagales, p__Cyanobacteria,
 k__Bacteria, and o__Clostridiales.</p>
@@ -1572,14 +1572,14 @@ k__Bacteria, and o__Clostridiales.</p>
 <p>The analysis will focus on the most complete bins, i.e bins with a
 completeness greater than 15% (more likely to contain the majority of
 useful information on function within the bbd community). These bins
-will probbaly represent the most abundant taxa (and best assembled).</p>
+will likely represent the most abundant taxa (and best assembled).</p>
 <p>Extract top 15% bins for completeness:</p>
 <pre class="bash"><code>cat checkm_results_bbd.txt | awk &#39;$13&gt;15&#39;
 
 cat checkm_results_bbd.txt | awk &#39;$13&gt;15{print $1}&#39;
 
 cat checkm_results_bbd.txt | awk &#39;$13&gt;15{print $1}&#39; &gt; bbd_topbins.txt</code></pre>
-<p>Saved output as bbd_topbins.txt.</p>
+<p>Saved output as <code>bbd_topbins.txt.</code></p>
 </div>
 </div>
 <div id="taxonomy" class="section level1">
@@ -1588,35 +1588,27 @@ cat checkm_results_bbd.txt | awk &#39;$13&gt;15{print $1}&#39; &gt; bbd_topbins.
 Explain what this step does and why, and copy each command you ran into a
 bash chunk. R chunks run from the top of the repository.
 -->
-<p>Taxonomic classification of the most complete bins with GTDB-Tk.
-Commands for this step were run in <code>gtdbtk/</code>.</p>
-<p>Setup loop to read bins:</p>
+<p>Taxonomic classification of the most complete bins, following the
+CheckM quality assessment, were classified using <code>GTDB-Tk.</code>
+Commands for this step were run from the <code>gtdbtk/</code>
+directory.</p>
+<p>To prepare the genomes for classification, the list of bins retained
+during the CheckM assessment were used to copy the corresponding genome
+FASTA files into the <code>GTDB-Tk</code> input directory:</p>
 <pre class="bash"><code>while read bin;do echo $bin;done &lt; ../checkm/bbd_topbins.txt
 
 while read bin;do echo &quot;../metabat/bins_bbd/${bin}.fa&quot;;done &lt; ../checkm/bbd_topbins.txt
 
 while read bin;do cp &quot;../metabat/bins_bbd/${bin}.fa&quot; genomes;done &lt; ../checkm/bbd_topbins.txt</code></pre>
-<p>Should see one file for each of the bins:</p>
-<pre class="bash"><code>ls genomes</code></pre>
-<p>Create a slurm script to run gtdbtk.</p>
-<pre class="bash"><code>#!/bin/bash
-#SBATCH --time=120
-#SBATCH --ntasks=2 --mem=56gb
+<p><code>GTDB-Tk</code> was run using the slurm script
+<code>run_gtdbtk.sh</code> within <code>/gtdbtk</code>, and the output
+was confirmed and moved from the output directory into the main
+<code>gtdbtl/</code> directory for further analysis:</p>
+<pre class="bash"><code>sbatch run_gtdbtk.sh
 
-echo &quot;Starting gtdbtk in $(pwd) at $(date)&quot;
+ls -l out/gtdbtk.bac120.summary.tsv
 
-shopt -s expand_aliases
-alias gtdbtk=&#39;apptainer run -B /pvol:/pvol,/pvol/data/mg/gtdbtkdata/release207_v2/:/refdata /pvol/data/sif/gtdbtk.sif&#39;
-
-gtdbtk classify_wf -x fa --cpus 2 --genome_dir genomes --out_dir out --skip_ani_screen
-
-echo &quot;Finished gtdbtk in $(pwd) at $(date)&quot;</code></pre>
-<p>Submit the job (487):</p>
-<pre class="bash"><code>sbatch run_gtdbtk.sh</code></pre>
-<p>Confirm output.</p>
-<pre class="bash"><code>ls -l out/gtdbtk.bac120.summary.tsv</code></pre>
-<p>Move output.</p>
-<pre class="bash"><code>cp out/gtdbtk.bac120.summary.tsv .</code></pre>
+cp out/gtdbtk.bac120.summary.tsv .</code></pre>
 </div>
 <div id="gene-annotation" class="section level1">
 <h1>Gene annotation</h1>
@@ -1630,29 +1622,21 @@ Commands for this step were run in <code>prokka/</code>.</p>
 bbd taxa within the mat to further our understanding of metabolic
 processes present. Prokka will identify the gene sequences and identify
 homologous genes with known functions.</p>
-<p>Look at bins, select a test one to run Prokka.</p>
-<pre class="bash"><code>cat ../checkm/bbd_topbins.txt</code></pre>
-<p>Investigate bin <code>metabat.30</code> as a test.</p>
-<pre class="bash"><code>bin=metabat.30
-prokka --cpus 2 --outdir $bin --prefix $bin  ../metabat/bins_bbd/${bin}.fa</code></pre>
-<p>List results:</p>
-<pre class="bash"><code>ls metabat.30</code></pre>
-<p>Test looked good, so will run prokka (slurm job 491, shell script =
-run_prokka.sh) on all the metagenomes.</p>
-<pre class="bash"><code>#!/bin/bash
-#SBATCH --time=90
-#SBATCH --ntasks=2 --mem=2gb
+<p>To run <code>Prokka</code>, the bin <code>metabat.30</code> bin was
+chosen as a test:</p>
+<pre class="bash"><code>cat ../checkm/bbd_topbins.txt
 
-echo &quot;Starting prokka in $(pwd) at $(date)&quot;
+bin=metabat.30
+prokka --cpus 2 --outdir $bin --prefix $bin  ../metabat/bins_bbd/${bin}.fa
 
-shopt -s expand_aliases
-alias prokka=&#39;apptainer run -B /pvol/:/pvol /pvol/data/sif/prokka.sif prokka&#39;
-
-while read bin;do 
-  prokka --cpus 2 --outdir $bin --prefix $bin &quot;../metabat/bins_bbd/${bin}.fa&quot;;
-done &lt; ../checkm/bbd_topbins.txt
-
-echo &quot;Finished prokka in $(pwd) at $(date)&quot;</code></pre>
+ls metabat.30</code></pre>
+<p>Next, <code>Prokka</code> was run seperately on each genome listed in
+<code>bbd_topbins.txt</code>. Each bin was given a seperate FASTA file,
+with its bin identifier used to name any outputs. This was done using
+the slurm script <code>run_prokka.sh1</code> within
+<code>/prokka</code>. This produced predicted genes and associated
+functional information for each genome bin for further pathway
+analysis.</p>
 </div>
 <div id="metabolic-pathways" class="section level1">
 <h1>Metabolic pathways</h1>
@@ -1660,9 +1644,12 @@ echo &quot;Finished prokka in $(pwd) at $(date)&quot;</code></pre>
 Explain what this step does and why, and copy each command you ran into a
 bash chunk. R chunks run from the top of the repository.
 -->
-<p>Metabolic pathways inferred from the Prokka annotations with MinPath.
-Commands for this step were run in <code>minpath/</code>.</p>
-<p>Start by investigating a single bin (<code>metabat.30</code>)</p>
+<p>Metabolic pathways were inferred from the Prokka gene annotations
+using <code>MinPath</code>. <code>MiniPath</code> uses annotated enzyme
+comission numbers to identify pathways that may explain genes detected
+within each bin. All commands for this step were run in the
+<code>minpath/</code> directory.</p>
+<p>First, a single bin <code>metabat.30</code> was investigated:</p>
 <pre class="bash"><code>head ../prokka/metabat.30/metabat.30.tsv</code></pre>
 <p>For input to minpath we only want to keep a unique ID for each gene
 (column 1) and its EC number (column 5). Must transform the tsv into
@@ -1686,15 +1673,17 @@ minpath:</p>
 <pre class="bash"><code>head metabat.30.ec.report </code></pre>
 <p>Line 1:
 <code>path PWY-6012-1 any n/a  naive 1  minpath 1  fam0  1  fam-found  1  name  acyl carrier protein activation.</code>
-- PWY-6012-1 is a pathway identifier in the metacyc database. You can
-use this to lookup the full pathway. - native 1: at least one gene from
-this pathway was found. - minipath 1: minpath kept this pathway in its
-minimal set of pathways. If this says minpath 0 then minpath decided
-that the genes found are better explained by other pathways, so the
-evidence for this one is weak - fam0 1: one gene involved in this path -
-fam-found 1: one gene family from the pathway in this genome - name acyl
-carrier protein activation: pathway name</p>
-<p>Prepare minipath inputs for all bins, and then run:</p>
+- <code>PWY-6012-1</code> is a pathway identifier in the metacyc
+database. - <code>native 1</code>: at least one gene from this pathway
+was found. - <code>minipath 1</code>: minpath kept this pathway in its
+minimal set of pathways. If this says <code>minpath 0</code> then
+minpath decided that the genes found are better explained by other
+pathways, so the evidence for this one is weak - <code>fam0 1</code>:
+one gene involved in this path - <code>fam-found 1</code>: one gene
+family from the pathway in this genome -
+<code>name acyl carrier protein activation</code>: pathway name</p>
+<p>Next, the Prokka annoation was filtered to retain the gene identifier
+and EC for all bins (required for MiniPath).</p>
 <pre class="bash"><code>while read bin;do 
   cat ../prokka/$bin/${bin}.tsv | awk -F &#39;\t&#39; &#39;$5{printf(&quot;%s\t%s\n&quot;, $1,$5)}&#39; | grep -v &#39;^locus&#39; &gt; ${bin}.ec 
 done &lt; ../checkm/bbd_topbins.txt
@@ -1707,7 +1696,6 @@ pathway of interest is <code>PWY-101</code>, which includes the
 essential components of photosynthesis that occur in light, Photosystem
 I and Photosystem II.</p>
 <pre class="bash"><code>grep &#39;PWY-101&#39; *.ec.report</code></pre>
-<p>Assess the output:</p>
 <table style="width:100%;">
 <caption>Detection of the photosynthesis light-reaction pathway
 (PWY-101) across the unbinned contig and metagenome-assembled genome
@@ -1765,18 +1753,18 @@ I and Photosystem II.</p>
 </tr>
 </tbody>
 </table>
-<p>These results show that at least 4 bins contain at least one gene
-from this (PWY-101) pathway. Metabat.42 has 4/4 gene families (the
-complete pathway), while the other three families only have 1/4 genes
-from the pathway. MinPath retains the pathway for: metabat.15 and
-metabat.42.</p>
-<p>Cross reference the results with <code>gtdbtk</code> to see
-taxonomy.</p>
+<p>These results show that at least 4 bins contained at least one gene
+from the <code>PWY-1011 pathway</code>. <code>metabat.42</code> has 4/4
+gene families (the complete pathway), while the other three families
+only have 1/4 genes from the pathway. MinPath retains the pathway for
+only <code>metabat.15</code> and <code>metabat.42</code>.</p>
+<p>For taxonomic identification, the <code>gtdbtk</code> classification
+table was cross referenced to determien the taxonomy of the bins
+containing the <code>PWY-1011 pathway</code>:</p>
 <pre class="bash"><code>grep &#39;contig_120&#39; ../gtdbtk/gtdbtk.bac120.summary.tsv
 grep &#39;metabat.15&#39; ../gtdbtk/gtdbtk.bac120.summary.tsv
 grep &#39;metabat.41&#39; ../gtdbtk/gtdbtk.bac120.summary.tsv
 grep &#39;metabat.42&#39; ../gtdbtk/gtdbtk.bac120.summary.tsv</code></pre>
-<p>Clean results:</p>
 <table>
 <caption>Taxonomic classification and detection of the PWY-101
 photosynthesis light-reaction pathway across bins.</caption>
@@ -1839,9 +1827,9 @@ photosynthesis light-reaction pathway across bins.</caption>
 </tr>
 </tbody>
 </table>
-<p>Repeat the process for the path <code>PWY-5360</code>, a superpathway
-of tetrathionate reduction which includes enzymes required to reduce
-sulfite to hydrogen sulfide.</p>
+<p>This process was repeated for the second path <code>PWY-5360</code>,
+a superpathway of tetrathionate reduction which includes enzymes
+required to reduce sulfite to hydrogen sulfide:</p>
 <pre class="bash"><code>grep &#39;PWY-5360&#39; *.ec.report</code></pre>
 <table>
 <caption>Detection of the superpathway of tetrathionate reduction
@@ -1875,11 +1863,11 @@ sulfite to hydrogen sulfide.</p>
 </tr>
 </tbody>
 </table>
-<p>One bin, <code>metabat.12</code> contained at least one gene from
-this pathway. The pathway is detected by the naive method
-(<code>naive = 1</code>) but not retained by MinPath, so these results
-do not support a complete tetrathionate-reduction pathway in this
-bin.</p>
+<p>One bin, <code>metabat.12</code> contained at least one gene from the
+<code>PWY-5360</code> pathway. The pathway is detected by the naive
+method (<code>naive = 1</code>) but not retained by MinPath, so these
+results do not support a complete tetrathionate-reduction pathway in
+this bin.</p>
 <p>Cross reference the results with <code>gtdbtk</code> to see
 taxonomy:</p>
 <pre class="bash"><code>grep &#39;metabat.12&#39; ../gtdbtk/gtdbtk.bac120.summary.tsv</code></pre>

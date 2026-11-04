@@ -28,42 +28,15 @@ Gene prediction and annotation of the most complete bins with Prokka. Commands f
 
 The goal here is to assess the genes present within the genomes of bbd taxa within the mat to further our understanding of metabolic processes present. Prokka will identify the gene sequences and identify homologous genes with known functions.
 
-Look at bins, select a test one to run Prokka.
+To run `Prokka`, the bin `metabat.30` bin was chosen as a test: 
 
 ```{bash}
 cat ../checkm/bbd_topbins.txt
-```
 
-Investigate bin `metabat.30` as a test.
-
-```{bash}
 bin=metabat.30
 prokka --cpus 2 --outdir $bin --prefix $bin  ../metabat/bins_bbd/${bin}.fa
-```
 
-List results:
-
-```{bash}
 ls metabat.30
 ```
 
-Test looked good, so will run prokka (slurm job 491, shell script = run_prokka.sh) on all the metagenomes.
-
-```{bash}
-#!/bin/bash
-#SBATCH --time=90
-#SBATCH --ntasks=2 --mem=2gb
-
-echo "Starting prokka in $(pwd) at $(date)"
-
-shopt -s expand_aliases
-alias prokka='apptainer run -B /pvol/:/pvol /pvol/data/sif/prokka.sif prokka'
-
-while read bin;do 
-  prokka --cpus 2 --outdir $bin --prefix $bin "../metabat/bins_bbd/${bin}.fa";
-done < ../checkm/bbd_topbins.txt
-
-echo "Finished prokka in $(pwd) at $(date)"
-```
-
-
+Next, `Prokka` was run seperately on each genome listed in `bbd_topbins.txt`. Each bin was given a seperate FASTA file, with its bin identifier used to name any outputs. This was done using the slurm script `run_prokka.sh1` within `/prokka`. This produced predicted genes and associated functional information for each genome bin for further pathway analysis. 

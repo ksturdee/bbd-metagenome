@@ -4,7 +4,7 @@ author: "Kendra"
 date: "`r Sys.Date()`"
 output:
   github_document:
-    html_preview: false
+    html_preview: true
 ---
 
 ```{r setup, include=FALSE}
@@ -22,47 +22,30 @@ Explain what this step does and why, and copy each command you ran into a
 bash chunk. R chunks run from the top of the repository.
 -->
 
-Completeness and contamination of each bin, estimated with CheckM, and selection of the most complete bins for further analysis. Commands for this step were run in `checkm/`.
+Completeness and contamination of each bin were estimated with `CheckM`, and the most complete bins were chosen for further analysis. Commands for this step were run in `checkm/`.
 
-Check bin quality using checkm.
-
+Assembly contigs were sorted by sequence length to find the largest contig: 
 ```{bash}
 cat ../flye/bbd/assembly.fasta | bioawk -c fastx '{print length($seq),$name}' | sort -n
 ```
 
-Found largest contig in the bbd assembly, it is contig_120 (must manually add this contig because it probably isn’t included in the bins from metabat).
-
-Must save the contig_120 as a bin of its own, in the same folder as the metabat bins, so that all the later steps treat it just like the other bins. Then, must copy all of the bins, including the longest contig, into the bins_bbd folder inside checkm.
+The largest contig in the bbd assembly was `contig_120`. This contig must be manually saved as an independent bin, in the same folder as the metabat bins, so that all the later steps treat it just like the other bins. Then, must copy all of the bins, including `contig_120` into the `bins_bbd` folder inside `CheckM`.
 
 ```{bash}
 samtools faidx ../flye/bbd/assembly.fasta contig_120 > ../metabat/bins_bbd/contig_120.fa
 cp ../metabat/bins_bbd/*.fa bins_bbd/
 ```
 
-Create slurm script for the checkm run. Save it within the checkm directory as run_checkm_bbd.sh
-
+To assess quality with `CheckM`, the slurm script 'run_checkm_bbd.sh' was created and run:
 ```{bash}
-#!/bin/bash
-#SBATCH --time=60
-#SBATCH --ntasks=6 --mem=40gb
-
-echo "Starting checkm in $(pwd) at $(date)"
-
-shopt -s expand_aliases
-alias checkm='apptainer run -B /pvol/:/pvol /pvol/data/sif/checkm.sif checkm'
-
-checkm lineage_wf bins_bbd out -t 6 -x fa -f checkm_results_bbd.txt
-
-echo "Finished checkm in $(pwd) at $(date)"
+sbatch run_checkm_bbd.sh
 ```
-
-Submit the checkm job: `sbatch run_checkm_bbd.sh`
 
 ## Functional analysis of the BBD Metagenome
 
 The purpose of binning is to sort the metagenome into species and strain within the black band disease community. They can also be leveraged to make inferences about metabolic processes present within a BBD lesion. Overall, the purpose of this functional analysis is to investigate (1) what taxonomic groups of microbes are present, and (2) what can they do in terms of genes and biochemical pathways present.
 
-Check results within checkm_results_bbd
+The results were checked within `checkm_results_bbd`
 ```{bash}
 head checkm_results_bbd.txt 
 ```
@@ -74,7 +57,7 @@ Look further down the list:
 head -n 20 checkm_results_bbd.txt 
 ```
 
-The analysis will focus on the most complete bins, i.e bins with a completeness greater than 15% (more likely to contain the majority of useful information on function within the bbd community). These bins will probbaly represent the most abundant taxa (and best assembled). 
+The analysis will focus on the most complete bins, i.e bins with a completeness greater than 15% (more likely to contain the majority of useful information on function within the bbd community). These bins will likely represent the most abundant taxa (and best assembled). 
 
 Extract top 15% bins for completeness:
 ```{bash}
@@ -85,4 +68,4 @@ cat checkm_results_bbd.txt | awk '$13>15{print $1}'
 cat checkm_results_bbd.txt | awk '$13>15{print $1}' > bbd_topbins.txt
 ```
 
-Saved output as bbd_topbins.txt. 
+Saved output as `bbd_topbins.txt.`
