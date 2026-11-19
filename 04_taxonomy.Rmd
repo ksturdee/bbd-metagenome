@@ -17,12 +17,7 @@ knitr::opts_hooks$set(engine = function(options) {
 })
 ```
 
-<!--
-Explain what this step does and why, and copy each command you ran into a
-bash chunk. R chunks run from the top of the repository.
--->
-
-Taxonomic classification of the most complete bins, following the CheckM quality assessment, were classified using `GTDB-Tk.` Commands for this step were run from the `gtdbtk/` directory. 
+GTDB-Tk was used to classify the bins retained after the CheckM assessment. Commands for this step were run from the `gtdbtk/` directory. 
 
 To prepare the genomes for classification, the list of bins retained during the CheckM assessment were used to copy the corresponding genome FASTA files into the `GTDB-Tk` input directory:
 ```{bash}
@@ -33,7 +28,7 @@ while read bin;do echo "../metabat/bins_bbd/${bin}.fa";done < ../checkm/bbd_topb
 while read bin;do cp "../metabat/bins_bbd/${bin}.fa" genomes;done < ../checkm/bbd_topbins.txt
 ```
 
-`GTDB-Tk` was run using the slurm script `run_gtdbtk.sh` within `/gtdbtk`, and the output was confirmed and moved from the output directory into the main `gtdbtl/` directory for further analysis: 
+`GTDB-Tk` was run using the slurm script `run_gtdbtk.sh` within `/gtdbtk`, and the output was confirmed and moved from the output directory into the main `gtdbtk/` directory for further analysis: 
 ```{bash}
 sbatch run_gtdbtk.sh
 
