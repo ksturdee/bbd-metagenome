@@ -39,4 +39,4 @@ prokka --cpus 2 --outdir $bin --prefix $bin  ../metabat/bins_bbd/${bin}.fa
 ls metabat.30
 ```
 
-Next, `Prokka` was run seperately on each genome listed in `bbd_topbins.txt`. Each bin was given a seperate FASTA file, with its bin identifier used to name any outputs. This was done using the slurm script `run_prokka.sh1` within `/prokka`. This produced predicted genes and associated functional information for each genome bin for further pathway analysis. 
+Next, `Prokka` was run separately on each genome listed in `bbd_topbins.txt`. Each bin was given a seperate FASTA file, with its bin identifier used to name any outputs. This was done using the slurm script `run_prokka.sh` within `/prokka`. This produced predicted genes and associated functional information for each genome bin for further pathway analysis. 
