@@ -22,7 +22,7 @@ Explain what this step does and why, and copy each command you ran into a
 bash chunk. R chunks run from the top of the repository.
 -->
 
-Metabolic pathways were inferred from the Prokka gene annotations using `MinPath`. `MiniPath` uses annotated enzyme comission numbers to identify pathways that may explain genes detected within each bin. All commands for this step were run in the `minpath/` directory. 
+Metabolic pathways were inferred from the Prokka gene annotations using `MinPath`. `MinPath` uses annotated enzyme commission numbers to identify pathways that may explain genes detected within each bin. All commands for this step were run in the `minpath/` directory. 
 
 First, a single bin `metabat.30` was investigated:
 ```{bash}
@@ -63,12 +63,12 @@ head metabat.30.ec.report
 Line 1: `path PWY-6012-1 any n/a  naive 1  minpath 1  fam0  1  fam-found  1  name  acyl carrier protein activation.`
 - `PWY-6012-1` is a pathway identifier in the metacyc database. 
 - `native 1`: at least one gene from this pathway was found. 
-- `minipath 1`: minpath kept this pathway in its minimal set of pathways. If this says `minpath 0` then minpath decided that the genes found are better explained by other pathways, so the evidence for this one is weak
+- `MinPath 1`: minpath kept this pathway in its minimal set of pathways. If this says `minpath 0` then minpath decided that the genes found are better explained by other pathways, so the evidence for this one is weak
 - `fam0 1`: one gene involved in this path
 - `fam-found 1`: one gene family from the pathway in this genome
 - `name acyl carrier protein activation`: pathway name
 
-Next, the Prokka annoation was filtered to retain the gene identifier and EC for all bins (required for MiniPath).
+Next, the Prokka annoation was filtered to retain the gene identifier and EC for all bins (required for MinPath).
 ```{bash}
 while read bin;do 
   cat ../prokka/$bin/${bin}.tsv | awk -F '\t' '$5{printf("%s\t%s\n", $1,$5)}' | grep -v '^locus' > ${bin}.ec 
@@ -102,9 +102,9 @@ kable(
   col.names = c("Bin / contig", "Pathway", "Naive", "MinPath", "Families expected", "Families found")
 )
 ```
-These results show that at least 4 bins contained at least one gene from the `PWY-1011 pathway`. `metabat.42` has 4/4 gene families (the complete pathway), while the other three families only have 1/4 genes from the pathway. MinPath retains the pathway for only `metabat.15` and `metabat.42`.
+These results show that at least 4 bins or contigs contained at least one of the expected gene families from the `PWY-101 pathway`. `metabat.42` had all four familiess (the complete pathway), while the other three had one of four. MinPath retained the pathway for only `metabat.15` and `metabat.42`.
 
-For taxonomic identification, the `gtdbtk` classification table was cross referenced to determien the taxonomy of the bins containing the `PWY-1011 pathway`:
+For taxonomic identification, the `gtdbtk` classification table was cross referenced to determine the taxonomy of the bins containing the `PWY-101 pathway`:
 ```{bash}
 grep 'contig_120' ../gtdbtk/gtdbtk.bac120.summary.tsv
 grep 'metabat.15' ../gtdbtk/gtdbtk.bac120.summary.tsv
@@ -121,10 +121,10 @@ pathway_taxonomy <- tribble(
   "UBA2561 sp002340355", "1/4", 0,
 
   "metabat.15", "Firmicutes_A", "Clostridia", "Vallitaleaceae",
-  "Unclassified", "1/4", 1,
+  "No genus or species assigned", "1/4", 1,
 
   "metabat.41", "Desulfobacterota", "Desulfobacteria", "Desulforegulaceae",
-  "Unclassified", "1/4", 0,
+  "No genus or species assigned", "1/4", 0,
 
   "metabat.42", "Cyanobacteria", "Cyanobacteriia", "Desertifilaceae",
   "Roseofilum reptotaenium_A", "4/4", 1
@@ -141,7 +141,7 @@ This process was repeated for the second path `PWY-5360`, a superpathway of tetr
 ```{bash}
 grep 'PWY-5360' *.ec.report
 ```
-```{r tetrathionate-table, echo=FALSE, message=FALSE, warning=FALSE}
+```{r Tetrathionate-Table, echo=FALSE, message=FALSE, warning=FALSE}
 library(tibble) 
 library(knitr)
 
@@ -180,7 +180,7 @@ kable(
 )
 ```
 
-`metabat.12` corresponds to the order Campylobacterales and family Arcobacteraceae, and was classified to the genus Halarcobacter. However the evidence for this was weak; only 1/3 of the expected gene families were detected and minipath did not retain the pathway. 
+`metabat.12` corresponds to the order Campylobacterales and family Arcobacteraceae, and was classified to the genus Halarcobacter. However the evidence for this was weak; only 1/3 of the expected gene families were detected and MinPath did not retain the pathway. 
 
 
 

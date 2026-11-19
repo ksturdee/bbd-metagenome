@@ -1,0 +1,32 @@
+BBD Metagenome: Taxonomy
+================
+Kendra
+2026-11-19
+
+GTDB-Tk was used to classify the bins retained after the CheckM
+assessment. Commands for this step were run from the `gtdbtk/`
+directory.
+
+To prepare the genomes for classification, the list of bins retained
+during the CheckM assessment were used to copy the corresponding genome
+FASTA files into the `GTDB-Tk` input directory:
+
+``` bash
+while read bin;do echo $bin;done < ../checkm/bbd_topbins.txt
+
+while read bin;do echo "../metabat/bins_bbd/${bin}.fa";done < ../checkm/bbd_topbins.txt
+
+while read bin;do cp "../metabat/bins_bbd/${bin}.fa" genomes;done < ../checkm/bbd_topbins.txt
+```
+
+`GTDB-Tk` was run using the slurm script `run_gtdbtk.sh` within
+`/gtdbtk`, and the output was confirmed and moved from the output
+directory into the main `gtdbtk/` directory for further analysis:
+
+``` bash
+sbatch run_gtdbtk.sh
+
+ls -l out/gtdbtk.bac120.summary.tsv
+
+cp out/gtdbtk.bac120.summary.tsv .
+```

@@ -20,6 +20,7 @@ knitr::opts_hooks$set(engine = function(options) {
 options(knitr.duplicate.label = "allow")
 ```
 
+```{=html}
 <!--
 This file joins all of the step files into one web page. Knit it to make
 index.html, a single file you can open in a browser or upload. Each step file
@@ -28,6 +29,7 @@ fix any errors there.
 
 If you add a step file, add a heading and a child chunk for it below.
 -->
+```
 
 # Assembly
 

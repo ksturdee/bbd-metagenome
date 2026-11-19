@@ -91,6 +91,8 @@ figure1 <- ggplot(gc_df, aes(x = GC)) +
     axis.text = element_text(colour = "black"),
     axis.title = element_text(colour = "black")
   )
+
+print(figure1)
 ```
 Figure 1.  Distribution of GC content among contigs in the BBD metagenome assembly.
 
@@ -246,6 +248,8 @@ figure2 <- ggplot(
     axis.ticks.y = element_blank(),
     plot.margin = margin(10, 20, 10, 10)
   )
+
+print(figure2)
 ```
 Figure 2. Estimated completeness of genome bins of the BBD metagenome. Taxonomic labels represent the lowest classification assigned by GTDB-Tk. Only bins with >15% estimated completeness are shown.
 
