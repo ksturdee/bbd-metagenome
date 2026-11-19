@@ -59,7 +59,7 @@ head -n 20 checkm_results_bbd.txt
 
 The analysis will focus on the most complete bins, i.e bins with a completeness greater than 15% (more likely to contain the majority of useful information on function within the bbd community). These bins will likely represent the most abundant taxa (and best assembled). 
 
-Extract top 15% bins for completeness:
+Extract bins with completeness greater than 15%:
 ```{bash}
 cat checkm_results_bbd.txt | awk '$13>15'
 
